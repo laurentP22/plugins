@@ -8,6 +8,10 @@ import android.app.Activity;
 import android.content.Context;
 import android.graphics.ImageFormat;
 import android.graphics.SurfaceTexture;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Matrix;
+import android.util.DisplayMetrics;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
@@ -31,6 +35,7 @@ import io.flutter.plugin.common.MethodChannel.Result;
 import io.flutter.view.TextureRegistry.SurfaceTextureEntry;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -236,6 +241,21 @@ public class Camera {
         reader -> {
           try (Image image = reader.acquireLatestImage()) {
             ByteBuffer buffer = image.getPlanes()[0].getBuffer();
+
+            // Mirror image (Front Camera)
+            if (isFrontFacing) {
+              byte[] buf2 = new byte[buffer.remaining()];
+              buffer.get(buf2);
+              Bitmap bitmap = BitmapFactory.decodeByteArray(buf2, 0, buf2.length);
+              Matrix m = new Matrix();
+              m.preScale(-1, 1);
+              Bitmap dst = Bitmap.createBitmap(bitmap, 0, 0, bitmap.getWidth(), bitmap.getHeight(), m, false);
+              dst.setDensity(DisplayMetrics.DENSITY_DEFAULT);
+              ByteArrayOutputStream stream = new ByteArrayOutputStream();
+              dst.compress(Bitmap.CompressFormat.JPEG, 100, stream);
+              buffer = ByteBuffer.wrap(stream.toByteArray());
+            }
+
             writeToFile(buffer, file);
             result.success(null);
           } catch (IOException e) {
